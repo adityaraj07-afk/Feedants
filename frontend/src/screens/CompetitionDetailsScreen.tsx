@@ -48,47 +48,52 @@ export const CompetitionDetailsScreen: React.FC = () => {
 
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Initial load: Fetch available users and competitions
-  useEffect(() => {
-    async function init() {
-      try {
-        setLoading(true);
-        const [usersRes, compsRes] = await Promise.all([api.getUsers(), api.getCompetitions()]);
+  // Load initial app data (users, competitions, and details)
+  const initApp = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [usersRes, compsRes] = await Promise.all([api.getUsers(), api.getCompetitions()]);
 
-        setUsers(usersRes.users || []);
-        if (usersRes.users && usersRes.users.length > 0) {
-          // Default to first user (Alex Morgan)
-          setActiveUser(usersRes.users[0]);
-        }
-
-        setCompetitionsList(compsRes.competitions || []);
-      } catch (err: any) {
-        console.error('Initialization error:', err);
-        setError('Could not connect to backend server. Make sure the API is running at localhost:5000.');
-      } finally {
-        setLoading(false);
+      const fetchedUsers = usersRes.users || [];
+      setUsers(fetchedUsers);
+      const currentUser = activeUser || (fetchedUsers.length > 0 ? fetchedUsers[0] : null);
+      if (!activeUser && fetchedUsers.length > 0) {
+        setActiveUser(fetchedUsers[0]);
       }
+
+      setCompetitionsList(compsRes.competitions || []);
+
+      // Fetch active competition details
+      await loadCompetitionDetails(activeSlug, currentUser?._id);
+    } catch (err: any) {
+      console.error('Initialization error:', err);
+      setError(err.message || 'Could not connect to backend server. Make sure the API is running at localhost:5000.');
+    } finally {
+      setLoading(false);
     }
-    init();
+  };
+
+  useEffect(() => {
+    initApp();
   }, []);
 
   // Whenever activeSlug or activeUser changes, fetch full competition details
   useEffect(() => {
-    if (!activeSlug) return;
-    loadCompetitionDetails();
+    if (!activeSlug || loading) return;
+    loadCompetitionDetails(activeSlug, activeUser?._id);
   }, [activeSlug, activeUser]);
 
-  const loadCompetitionDetails = async () => {
+  const loadCompetitionDetails = async (slugToLoad = activeSlug, userIdToUse = activeUser?._id) => {
     try {
       setError(null);
-      const userId = activeUser?._id;
-      const res = await api.getCompetitionById(activeSlug, userId);
+      const res = await api.getCompetitionById(slugToLoad, userIdToUse);
       setCompetition(res.competition);
 
       // Concurrently fetch winners and referral info
       const [winnersRes, refRes] = await Promise.all([
-        api.getCompetitionWinners(activeSlug).catch(() => ({ winners: [] })),
-        userId ? api.getReferralDetails(activeSlug, userId).catch(() => null) : Promise.resolve(null),
+        api.getCompetitionWinners(slugToLoad).catch(() => ({ winners: [] })),
+        userIdToUse ? api.getReferralDetails(slugToLoad, userIdToUse).catch(() => null) : Promise.resolve(null),
       ]);
 
       setWinners(winnersRes.winners || []);
@@ -158,7 +163,7 @@ export const CompetitionDetailsScreen: React.FC = () => {
         <Text style={styles.errorIcon}>⚠️</Text>
         <Text style={styles.errorTitle}>Connection Issue</Text>
         <Text style={styles.errorMessage}>{error || 'Competition details not available.'}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadCompetitionDetails}>
+        <TouchableOpacity style={styles.retryButton} onPress={initApp}>
           <Text style={styles.retryButtonText}>Retry Connection</Text>
         </TouchableOpacity>
       </SafeAreaView>
