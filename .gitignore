@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment files
+.env
+.env*.local
+*.env
+backend/.env
+frontend/.env
+
+# Expo & Build artifacts
+.expo/
+*/.expo/
+dist/
+*/dist/
+web-build/
+*/web-build/
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
